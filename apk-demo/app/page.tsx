@@ -1,103 +1,127 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Header from "./Header";
+import Footer from "./Footer";
+
+type NetStatus = "checking" | "online" | "offline";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [status, setStatus] = useState<NetStatus>("checking");
+  const checkingRef = useRef(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const siteUrl = useMemo(() => "https://bestbazaar.in/", []);
+
+  // More reliable reachability probe using fetch with no-cors + timeout.
+  const probe = () =>
+    new Promise<boolean>((resolve) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        controller.abort();
+        resolve(false);
+      }, 4000);
+      // Any resolved response (opaque allowed) indicates the host is reachable
+      fetch("https://bestbazaar.in/", {
+        method: "GET",
+        mode: "no-cors",
+        cache: "no-store",
+        signal: controller.signal,
+      })
+        .then(() => {
+          clearTimeout(timer);
+          resolve(true);
+        })
+        .catch(() => {
+          clearTimeout(timer);
+          resolve(false);
+        });
+    });
+
+  const checkConnectivity = async () => {
+    if (checkingRef.current) return;
+    checkingRef.current = true;
+    try {
+      // First, use navigator.onLine as a quick hint, then verify with probe
+      const hint = typeof navigator !== "undefined" && (navigator as any).onLine !== undefined
+        ? navigator.onLine
+        : true;
+      if (!hint) {
+        setStatus("offline");
+        return;
+      }
+      const ok = await probe();
+      setStatus(ok ? "online" : "offline");
+    } finally {
+      checkingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    // Initial check
+    checkConnectivity();
+    // Listen to browser online/offline and re-check
+    const toOnline = () => checkConnectivity();
+    const toOffline = () => setStatus("offline");
+    window.addEventListener("online", toOnline);
+    window.addEventListener("offline", toOffline);
+    return () => {
+      window.removeEventListener("online", toOnline);
+      window.removeEventListener("offline", toOffline);
+    };
+  }, []);
+
+  // Periodic auto-retry while offline
+  useEffect(() => {
+    if (status !== "offline") return;
+    const id = setInterval(() => {
+      checkConnectivity();
+    }, 10000);
+    return () => clearInterval(id);
+  }, [status]);
+
+  const handleRetry = () => {
+    setStatus("checking");
+    checkConnectivity();
+  };
+
+  const OfflineScreen = (
+    <>
+      <Header />
+      <div className="flex flex-col items-center justify-center py-12 gap-6 px-4 text-center">
+        <div className="text-2xl font-semibold">
+          {"You're offline"}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <p className="text-gray-600 max-w-sm">
+          Please check your internet connection. We’ll load the latest content when you’re back online.
+        </p>
+        <button
+          onClick={handleRetry}
+          className="px-4 py-2 rounded-md bg-black text-white hover:opacity-90"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          Retry
+        </button>
+      </div>
+      <Footer />
+    </>
+  );
+
+  if (status === "checking") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="animate-pulse text-gray-700">Loading…</div>
+      </div>
+    );
+  }
+  if (status !== "online") return OfflineScreen;
+
+  // Only render the iframe once we have confirmed reachability to avoid native error page.
+  return (
+    <div className="fixed inset-0 w-full h-full">
+      <iframe
+        title="Best Bazaar"
+        src={siteUrl}
+        className="w-full h-full border-0"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+      />
     </div>
   );
 }

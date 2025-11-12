@@ -8,6 +8,7 @@ type NetStatus = "checking" | "online" | "offline";
 export default function Home() {
   const [status, setStatus] = useState<NetStatus>("checking");
   const checkingRef = useRef(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   const siteUrl = useMemo(() => "https://bestbazaar.in/", []);
 
@@ -58,6 +59,7 @@ export default function Home() {
   useEffect(() => {
     // Initial check
     checkConnectivity();
+
     // Listen to browser online/offline and re-check
     const toOnline = () => checkConnectivity();
     const toOffline = () => setStatus("offline");
@@ -83,6 +85,14 @@ export default function Home() {
     checkConnectivity();
   };
 
+  useEffect(() => {
+    if (status !== "online" || iframeLoaded) return;
+    const t = setTimeout(() => setIframeLoaded(true), 8000);
+    return () => clearTimeout(t);
+  }, [status, iframeLoaded]);
+
+  // Splash is per launch only, no persistence needed.
+
   const OfflineScreen = (
     <>
       <Header />
@@ -106,9 +116,16 @@ export default function Home() {
 
   if (status === "checking") {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="animate-pulse text-gray-700">Loading…</div>
-      </div>
+      <div
+        className="fixed inset-0 w-full h-full"
+        style={{
+          backgroundImage: "url('/splash.gif')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundColor: "#000",
+        }}
+      />
     );
   }
   if (status !== "online") return OfflineScreen;
@@ -121,7 +138,22 @@ export default function Home() {
         src={siteUrl}
         className="w-full h-full border-0"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        onLoad={() => {
+          setIframeLoaded(true);
+        }}
       />
+      {!iframeLoaded && (
+        <div
+          className="fixed inset-0 w-full h-full"
+          style={{
+            backgroundImage: "url('/splash.gif')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            backgroundColor: "#000",
+          }}
+        />
+      )}
     </div>
   );
 }

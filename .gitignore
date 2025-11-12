@@ -35,3 +35,4 @@ yarn-error.log*
 
 # APK outputs
 android/app/build/outputs/
+node_modules/

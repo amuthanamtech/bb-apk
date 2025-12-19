@@ -1,159 +1,140 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
-import Header from "./Header";
-import Footer from "./Footer";
-
-type NetStatus = "checking" | "online" | "offline";
+import { useEffect, useState } from "react";
 
 export default function Home() {
-  const [status, setStatus] = useState<NetStatus>("checking");
-  const checkingRef = useRef(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-
-  const siteUrl = useMemo(() => "https://bestbazaar.in/", []);
-
-  // More reliable reachability probe using fetch with no-cors + timeout.
-  const probe = () =>
-    new Promise<boolean>((resolve) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => {
-        controller.abort();
-        resolve(false);
-      }, 4000);
-      // Any resolved response (opaque allowed) indicates the host is reachable
-      fetch("https://bestbazaar.in/", {
-        method: "GET",
-        mode: "no-cors",
-        cache: "no-store",
-        signal: controller.signal,
-      })
-        .then(() => {
-          clearTimeout(timer);
-          resolve(true);
-        })
-        .catch(() => {
-          clearTimeout(timer);
-          resolve(false);
-        });
-    });
-
-  const checkConnectivity = async () => {
-    if (checkingRef.current) return;
-    checkingRef.current = true;
-    try {
-      // First, use navigator.onLine as a quick hint, then verify with probe
-      const hint = typeof navigator !== "undefined" && (navigator as any).onLine !== undefined
-        ? navigator.onLine
-        : true;
-      if (!hint) {
-        setStatus("offline");
-        return;
-      }
-      const ok = await probe();
-      setStatus(ok ? "online" : "offline");
-    } finally {
-      checkingRef.current = false;
-    }
-  };
+  const [fcmStatus, setFcmStatus] = useState<string>("Initializing FCM...");
+  const [fcmTokens, setFcmTokens] = useState<{capacitor?: string, firebase?: string}>({});
 
   useEffect(() => {
-    // Initial check
-    checkConnectivity();
+    // Register FCM tokens after component mounts
+    const registerFCM = async () => {
+      try {
+        console.log("📱 Starting FCM registration...");
 
-    // Listen to browser online/offline and re-check
-    const toOnline = () => checkConnectivity();
-    const toOffline = () => setStatus("offline");
-    window.addEventListener("online", toOnline);
-    window.addEventListener("offline", toOffline);
-    return () => {
-      window.removeEventListener("online", toOnline);
-      window.removeEventListener("offline", toOffline);
+        // Check if we're in Capacitor environment
+        if (typeof window === 'undefined' || !(window as any).Capacitor) {
+          console.log("📱 Not in Capacitor environment");
+          setFcmStatus("Not in Capacitor environment");
+          return;
+        }
+
+        console.log("📱 Capacitor environment detected");
+
+        // Delay to ensure app is fully loaded
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log("📱 Delay completed, loading FCM modules...");
+
+        // Dynamically import FCM modules
+        const { PushNotifications } = await import("@capacitor/push-notifications");
+        const { getMessaging, getToken } = await import("firebase/messaging");
+        const { VAPID_KEY } = await import("./firebase");
+
+        console.log("📱 FCM modules loaded successfully");
+
+        // Request permissions
+        const permResult = await PushNotifications.requestPermissions();
+        console.log("📱 Permission result:", permResult);
+
+        if (permResult.receive !== "granted") {
+          console.log("📱 Permission denied");
+          setFcmStatus("Permission denied - please allow notifications");
+          return;
+        }
+
+        console.log("📱 Permission granted, registering for push notifications...");
+        setFcmStatus("Registering for push notifications...");
+
+        // Register for push notifications
+        await PushNotifications.register();
+        console.log("📱 Push notifications registered");
+
+        // Set up listeners
+        PushNotifications.addListener("registration", async (token) => {
+          console.log("📱 ===== CAPACITOR FCM TOKEN RECEIVED =====");
+          console.log("📱 Capacitor Token:", token.value);
+
+          setFcmTokens(prev => ({ ...prev, capacitor: token.value }));
+          setFcmStatus("Capacitor token received, getting Firebase token...");
+
+          try {
+            // Get Firebase token
+            const messaging = getMessaging();
+            console.log("📱 Getting Firebase token...");
+
+            const firebaseToken = await getToken(messaging, {
+              vapidKey: VAPID_KEY
+            });
+
+            if (firebaseToken) {
+              console.log("📱 ===== FIREBASE FCM TOKEN RECEIVED =====");
+              console.log("📱 Firebase Token:", firebaseToken);
+
+              setFcmTokens(prev => ({ ...prev, firebase: firebaseToken }));
+              setFcmStatus("✅ FCM tokens successfully obtained!");
+            } else {
+              console.log("📱 Firebase token was null");
+              setFcmStatus("Capacitor token received, Firebase token failed");
+            }
+          } catch (firebaseError) {
+            console.error("📱 Firebase token error:", firebaseError);
+            setFcmStatus("Capacitor token received, Firebase token error");
+          }
+        });
+
+        PushNotifications.addListener("registrationError", (error) => {
+          console.error("📱 Registration error:", error);
+          setFcmStatus("❌ FCM registration failed: " + JSON.stringify(error));
+        });
+
+        console.log("📱 FCM setup completed");
+
+      } catch (error) {
+        console.error("📱 FCM setup error:", error);
+        setFcmStatus("❌ FCM setup failed: " + (error as Error).message);
+      }
     };
+
+    registerFCM();
   }, []);
 
-  // Periodic auto-retry while offline
-  useEffect(() => {
-    if (status !== "offline") return;
-    const id = setInterval(() => {
-      checkConnectivity();
-    }, 10000);
-    return () => clearInterval(id);
-  }, [status]);
-
-  const handleRetry = () => {
-    setStatus("checking");
-    checkConnectivity();
-  };
-
-  useEffect(() => {
-    if (status !== "online" || iframeLoaded) return;
-    const t = setTimeout(() => setIframeLoaded(true), 8000);
-    return () => clearTimeout(t);
-  }, [status, iframeLoaded]);
-
-  // Splash is per launch only, no persistence needed.
-
-  const OfflineScreen = (
-    <>
-      <Header />
-      <div className="flex flex-col items-center justify-center py-12 gap-6 px-4 text-center">
-        <div className="text-2xl font-semibold">
-          {"You're offline"}
-        </div>
-        <p className="text-gray-600 max-w-sm">
-          Please check your internet connection. We’ll load the latest content when you’re back online.
-        </p>
-        <button
-          onClick={handleRetry}
-          className="px-4 py-2 rounded-md bg-black text-white hover:opacity-90"
-        >
-          Retry
-        </button>
-      </div>
-      <Footer />
-    </>
-  );
-
-  if (status === "checking") {
-    return (
-      <div
-        className="fixed inset-0 w-full h-full"
-        style={{
-          backgroundImage: "url('/splash.gif')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          backgroundColor: "#000",
-        }}
-      />
-    );
-  }
-  if (status !== "online") return OfflineScreen;
-
-  // Only render the iframe once we have confirmed reachability to avoid native error page.
   return (
-    <div className="fixed inset-0 w-full h-full">
-      <iframe
-        title="Best Bazaar"
-        src={siteUrl}
-        className="w-full h-full border-0"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        onLoad={() => {
-          setIframeLoaded(true);
-        }}
-      />
-      {!iframeLoaded && (
-        <div
-          className="fixed inset-0 w-full h-full"
-          style={{
-            backgroundImage: "url('/splash.gif')",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-            backgroundColor: "#000",
-          }}
-        />
-      )}
+    <div className="fixed inset-0 w-full h-full bg-white flex items-center justify-center p-4">
+      <div className="text-center max-w-md w-full">
+        <h1 className="text-3xl font-bold mb-6 text-blue-600">Best Bazaar</h1>
+
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <div className="text-green-800 font-medium">✅ Application Running Successfully!</div>
+          <div className="text-green-600 text-sm mt-1">No auto-stopping</div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="text-blue-800 font-medium mb-2">📱 FCM Status</div>
+          <div className="text-blue-600 text-sm">{fcmStatus}</div>
+
+          {fcmTokens.capacitor && (
+            <div className="mt-3 p-2 bg-blue-100 rounded text-xs">
+              <div className="font-medium text-blue-800">Capacitor Token:</div>
+              <div className="text-blue-600 break-all">{fcmTokens.capacitor}</div>
+            </div>
+          )}
+
+          {fcmTokens.firebase && (
+            <div className="mt-2 p-2 bg-green-100 rounded text-xs">
+              <div className="font-medium text-green-800">Firebase Token:</div>
+              <div className="text-green-600 break-all">{fcmTokens.firebase}</div>
+            </div>
+          )}
+        </div>
+
+        <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+          <p className="font-medium mb-1">📋 Check Android Studio Logcat for:</p>
+          <ul className="text-left space-y-1">
+            <li>• 📱 Starting FCM registration...</li>
+            <li>• 📱 ===== CAPACITOR FCM TOKEN =====</li>
+            <li>• 📱 ===== FIREBASE FCM TOKEN =====</li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }

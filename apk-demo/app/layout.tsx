@@ -30,8 +30,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <BackButtonHandler />
-        <PermissionsGate />
-        <main className="min-h-[calc(100vh-112px)]">{children}</main>
+        {children}
       </body>
     </html>
   );

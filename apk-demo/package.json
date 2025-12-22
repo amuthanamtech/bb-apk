@@ -15,6 +15,7 @@
     "@capacitor/filesystem": "^7.1.4",
     "@capacitor/geolocation": "^7.1.5",
     "@capacitor/push-notifications": "^7.0.3",
+    "dotenv": "^17.2.3",
     "firebase": "^11.10.0",
     "firebase-admin": "^13.6.0",
     "mssql": "^12.2.0",

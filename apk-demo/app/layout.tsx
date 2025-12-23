@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./scroll-optimization.js";
 import PermissionsGate from "./PermissionsGate";
 import BackButtonHandler from "./BackButtonHandler";
 

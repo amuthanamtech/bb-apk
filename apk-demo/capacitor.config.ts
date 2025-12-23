@@ -8,6 +8,17 @@ const config: CapacitorConfig = {
     url: 'https://bestbazaar.in',
     cleartext: true,
     androidScheme: 'https'
+  },
+  // Performance optimizations for smooth scrolling
+  android: {
+    // Enable hardware acceleration
+    allowMixedContent: true,
+    // Optimize WebView settings
+    webContentsDebuggingEnabled: false, // Set to true for debugging
+  },
+  // General performance settings
+  plugins: {
+    // Add any performance-related plugin configurations here
   }
 };
 

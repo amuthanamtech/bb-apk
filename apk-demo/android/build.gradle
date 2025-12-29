@@ -7,7 +7,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.7.2'
+        classpath 'com.android.tools.build:gradle:8.13.1'
         classpath 'com.google.gms:google-services:4.4.2'
 
         // NOTE: Do not place your application dependencies here; they belong
@@ -21,6 +21,30 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+}
+
+subprojects { proj ->
+    afterEvaluate {
+        if (proj.hasProperty('android') && proj.android.hasProperty('compileOptions')) {
+            proj.android.compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+        }
+        // If Kotlin is present, align JVM target to 17
+        if (proj.plugins.hasPlugin('org.jetbrains.kotlin.android') || proj.plugins.hasPlugin('kotlin-android')) {
+            if (proj.hasProperty('kotlinOptions')) {
+                proj.kotlinOptions {
+                    jvmTarget = '17'
+                }
+            }
+            proj.tasks.matching { it.name.startsWith('compile') && it.name.endsWith('Kotlin') }.configureEach {
+                if (it.hasProperty('kotlinOptions')) {
+                    it.kotlinOptions.jvmTarget = '17'
+                }
+            }
+        }
     }
 }
 

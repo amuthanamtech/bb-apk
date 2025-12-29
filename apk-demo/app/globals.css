@@ -10,7 +10,83 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* App brand colors for gradients and text */
+  --color-dynamic: #8E2DE2;
+  --color-dynamic1: #FF4FD8;
 }
+
+/* ===== SCROLLING OPTIMIZATIONS FOR ANDROID WEBVIEW ===== */
+
+/* Global scroll behavior optimizations */
+html, body {
+  /* Enable smooth scrolling where appropriate */
+  scroll-behavior: smooth;
+
+  /* Prevent scroll chaining and momentum scrolling issues */
+  overscroll-behavior: none;
+
+  /* Enable touch scrolling on Android */
+  -webkit-overflow-scrolling: touch;
+
+  /* Prevent text selection issues during scroll */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Reset for scrollable containers */
+* {
+  /* Use GPU acceleration for better performance */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+
+  /* Optimize box-sizing for better layout performance */
+  box-sizing: border-box;
+}
+
+/* Scrollable containers optimization */
+.overflow-auto,
+.overflow-y-auto,
+.overflow-x-auto {
+  /* Enable hardware acceleration */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+
+  /* Optimize scrolling */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+
+  /* Prevent scroll lag */
+  will-change: scroll-position;
+}
+
+/* Avoid fixed positioning inside scrollable areas when possible */
+.position-fixed {
+  /* Use transform instead of top/left for better performance */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+}
+
+/* Optimize animations and transitions during scroll */
+* {
+  /* Use transform and opacity for smooth animations */
+  transition-property: transform, opacity;
+  transition-timing-function: ease-out;
+}
+
+/* Disable heavy effects during scroll */
+.scrolling * {
+  /* Temporarily disable box-shadow and filters during scroll */
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+
+  /* Force hardware acceleration */
+  transform: translate3d(0, 0, 0) !important;
+  -webkit-transform: translate3d(0, 0, 0) !important;
+}
+
+/* ===== END SCROLLING OPTIMIZATIONS ===== */
 
 @media (prefers-color-scheme: dark) {
   :root {
